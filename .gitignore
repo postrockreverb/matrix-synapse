@@ -1,0 +1,18 @@
+# Secrets
+.env
+
+# Config files (copied from .example, contain secrets)
+synapse/homeserver.yaml
+coturn/turnserver.conf
+element/config.json
+
+# Synapse runtime files
+synapse/*.signing.key
+synapse/signing.key
+synapse/*.pid
+
+# Docker volumes (if using bind mounts)
+postgres_data/
+
+# Claude Code
+.claude/

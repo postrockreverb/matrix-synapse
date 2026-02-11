@@ -1,0 +1,63 @@
+# =============================================================================
+# Caddyfile - Reverse proxy for Matrix Synapse + Element
+# =============================================================================
+# Caddy automatically provisions and renews Let's Encrypt TLS certificates.
+# No manual certificate management needed.
+# =============================================================================
+
+# --- Matrix Synapse (Client + Federation on 443) ---
+{$SYNAPSE_HOSTNAME} {
+	# .well-known endpoints for federation delegation and client discovery
+	# These tell other servers and clients how to reach your homeserver
+	handle /.well-known/matrix/server {
+		header Content-Type application/json
+		header Access-Control-Allow-Origin *
+		respond `{"m.server": "{$SYNAPSE_HOSTNAME}:443"}`
+	}
+
+	handle /.well-known/matrix/client {
+		header Content-Type application/json
+		header Access-Control-Allow-Origin *
+		respond `{"m.homeserver": {"base_url": "https://{$SYNAPSE_HOSTNAME}"}}`
+	}
+
+	# Proxy everything else to Synapse
+	handle {
+		reverse_proxy synapse:8008
+	}
+}
+
+# --- Matrix Federation (port 8448) ---
+# Some servers still expect federation on 8448. This handles that.
+{$SYNAPSE_HOSTNAME}:8448 {
+	reverse_proxy synapse:8008
+}
+
+# --- Element Web Client ---
+{$ELEMENT_HOSTNAME} {
+	reverse_proxy element:80
+}
+
+# --- Base domain .well-known delegation (optional) ---
+# If your DOMAIN != SYNAPSE_HOSTNAME, serve .well-known from the base domain
+# so that @user:example.com works even though Synapse runs on matrix.example.com
+# Uncomment and adjust if your base domain is served by this same Caddy instance:
+#
+# {$DOMAIN} {
+# 	handle /.well-known/matrix/server {
+# 		header Content-Type application/json
+# 		header Access-Control-Allow-Origin *
+# 		respond `{"m.server": "{$SYNAPSE_HOSTNAME}:443"}`
+# 	}
+#
+# 	handle /.well-known/matrix/client {
+# 		header Content-Type application/json
+# 		header Access-Control-Allow-Origin *
+# 		respond `{"m.homeserver": {"base_url": "https://{$SYNAPSE_HOSTNAME}"}}`
+# 	}
+#
+# 	# Serve your normal website or redirect
+# 	handle {
+# 		respond "Hello" 200
+# 	}
+# }

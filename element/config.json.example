@@ -1,0 +1,32 @@
+{
+    "default_server_config": {
+        "m.homeserver": {
+            "base_url": "https://CHANGEME_SYNAPSE_HOSTNAME",
+            "server_name": "CHANGEME_DOMAIN"
+        }
+    },
+    "brand": "Element",
+    "integrations_ui_url": "https://scalar.vector.im/",
+    "integrations_rest_url": "https://scalar.vector.im/api",
+    "integrations_widgets_urls": [
+        "https://scalar.vector.im/_matrix/integrations/v1",
+        "https://scalar.vector.im/api"
+    ],
+    "bug_report_endpoint_url": "https://element.io/bugreports/submit",
+    "showLabsSettings": true,
+    "features": {
+        "feature_video_rooms": true,
+        "feature_group_calls": true,
+        "feature_element_call_video_rooms": true
+    },
+    "element_call": {
+        "url": "https://call.element.io"
+    },
+    "map_style_url": "https://api.maptiler.com/maps/streets/style.json?key=fU3vlMsMn4Jb6dnEIFsx",
+    "room_directory": {
+        "servers": [
+            "CHANGEME_DOMAIN",
+            "matrix.org"
+        ]
+    }
+}

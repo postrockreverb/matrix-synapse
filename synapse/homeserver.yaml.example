@@ -1,0 +1,152 @@
+# =============================================================================
+# Matrix Synapse - homeserver.yaml
+# =============================================================================
+# Edit this file directly. Replace every CHANGEME_* value with your own.
+#
+# Full config reference:
+#   https://element-hq.github.io/synapse/latest/usage/configuration/config_documentation.html
+# =============================================================================
+
+# --- Server Identity ---
+# CRITICAL: Cannot be changed after first start without breaking federation
+server_name: "CHANGEME_DOMAIN"
+public_baseurl: "https://CHANGEME_SYNAPSE_HOSTNAME/"
+pid_file: /data/homeserver.pid
+
+# --- Listeners ---
+listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    bind_addresses: ['0.0.0.0']
+    resources:
+      - names: [client, federation]
+        compress: false
+
+# --- Database ---
+database:
+  name: psycopg2
+  txn_limit: 10000
+  args:
+    user: "CHANGEME_POSTGRES_USER"
+    password: "CHANGEME_POSTGRES_PASSWORD"
+    database: "CHANGEME_POSTGRES_DB"
+    host: postgres
+    port: 5432
+    cp_min: 5
+    cp_max: 10
+
+# --- Logging ---
+log_config: "/data/log.config"
+
+# --- Media ---
+media_store_path: /data/media_store
+max_upload_size: "50M"
+url_preview_enabled: true
+url_preview_ip_range_blacklist:
+  - '127.0.0.0/8'
+  - '10.0.0.0/8'
+  - '172.16.0.0/12'
+  - '192.168.0.0/16'
+  - '100.64.0.0/10'
+  - '192.0.0.0/24'
+  - '169.254.0.0/16'
+  - '::1/128'
+  - 'fe80::/10'
+  - 'fc00::/7'
+  - '2001:db8::/32'
+  - 'ff00::/8'
+  - 'fec0::/10'
+
+# --- Registration ---
+enable_registration: false
+registration_shared_secret: "CHANGEME_REGISTRATION_SECRET"
+
+# --- Secrets ---
+# Generate each with: openssl rand -hex 32
+macaroon_secret_key: "CHANGEME_MACAROON_SECRET"
+form_secret: "CHANGEME_FORM_SECRET"
+signing_key_path: "/data/signing.key"
+
+# --- Trusted Key Servers ---
+trusted_key_servers:
+  - server_name: "matrix.org"
+
+# --- Federation ---
+# serve_server_wellknown tells Synapse to respond to /.well-known/matrix/server
+# We handle this in Caddy instead for more control, but you can enable this
+# if you prefer Synapse to handle it directly.
+# serve_server_wellknown: true
+
+# Federation allow/deny lists (empty = federate with everyone)
+# federation_domain_whitelist:
+#   - matrix.org
+#   - example.com
+
+# --- TURN / VoIP ---
+# This is what enables voice calls and screen sharing to work reliably,
+# especially when users are behind NAT/firewalls.
+turn_uris:
+  - "turn:CHANGEME_SYNAPSE_HOSTNAME:3478?transport=udp"
+  - "turn:CHANGEME_SYNAPSE_HOSTNAME:3478?transport=tcp"
+  - "turns:CHANGEME_SYNAPSE_HOSTNAME:5349?transport=udp"
+  - "turns:CHANGEME_SYNAPSE_HOSTNAME:5349?transport=tcp"
+turn_shared_secret: "CHANGEME_TURN_SECRET"
+turn_user_lifetime: 86400000
+turn_allow_guests: false
+
+# --- Rate Limiting ---
+rc_message:
+  per_second: 0.2
+  burst_count: 10
+
+rc_registration:
+  per_second: 0.17
+  burst_count: 3
+
+rc_login:
+  address:
+    per_second: 0.17
+    burst_count: 3
+  account:
+    per_second: 0.17
+    burst_count: 3
+
+# --- Caching ---
+# Tune based on available RAM. Default is 0.5 (uses ~512MB).
+# Reduce to 0.1-0.2 on a small VPS (2GB RAM).
+caches:
+  global_factor: 0.5
+
+# --- Presence ---
+# Disable if you want to save resources on a small server
+presence:
+  enabled: true
+
+# --- Push ---
+push:
+  include_content: false
+
+# --- Retention ---
+# Uncomment to auto-purge old messages
+# retention:
+#   enabled: true
+#   default_policy:
+#     min_lifetime: 1d
+#     max_lifetime: 365d
+
+# --- Email (uncomment and configure for password resets, notifications) ---
+# email:
+#   smtp_host: "SMTP_HOST"
+#   smtp_port: 587
+#   smtp_user: "SMTP_USER"
+#   smtp_pass: "SMTP_PASSWORD"
+#   require_transport_security: true
+#   notif_from: "Matrix <matrix@example.com>"
+#   app_name: "Matrix"
+
+# --- Experimental Features ---
+# Enable spaces, threads, etc. (most are now stable)
+experimental_features:
+  msc3266_enabled: true   # Room summary API

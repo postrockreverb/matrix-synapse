@@ -1,0 +1,93 @@
+services:
+  # ===========================================================================
+  # PostgreSQL - Database backend for Synapse
+  # ===========================================================================
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - matrix_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================================================
+  # Synapse - Matrix homeserver
+  # ===========================================================================
+  synapse:
+    image: matrixdotorg/synapse:latest
+    restart: unless-stopped
+    environment:
+      SYNAPSE_CONFIG_PATH: /data/homeserver.yaml
+    volumes:
+      - ./synapse:/data
+      - synapse_media:/data/media_store
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - matrix_internal
+      - caddy_net
+
+  # ===========================================================================
+  # Element Web - Matrix web client
+  # ===========================================================================
+  element:
+    image: vectorim/element-web:latest
+    restart: unless-stopped
+    volumes:
+      - ./element/config.json:/app/config.json:ro
+    networks:
+      - caddy_net
+
+  # ===========================================================================
+  # coturn - TURN/STUN server for VoIP and screen sharing
+  # ===========================================================================
+  # NOTE: coturn uses host networking because Docker port-range mapping creates
+  # one iptables rule per port, which is extremely inefficient for the relay
+  # port range (49152-49200+). Host networking avoids this entirely.
+  coturn:
+    image: coturn/coturn:latest
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./coturn/turnserver.conf:/etc/turnserver.conf:ro
+
+  # ===========================================================================
+  # Caddy - Reverse proxy with automatic HTTPS (Let's Encrypt)
+  # ===========================================================================
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3 (QUIC)
+      - "8448:8448"      # Matrix federation
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - caddy_net
+
+volumes:
+  postgres_data:
+  synapse_media:
+  caddy_data:
+  caddy_config:
+
+networks:
+  matrix_internal:
+    # Synapse <-> Postgres only
+  caddy_net:
+    # Caddy <-> Synapse/Element
