@@ -12,6 +12,7 @@
 server_name: "CHANGEME_DOMAIN"
 public_baseurl: "https://CHANGEME_SYNAPSE_HOSTNAME/"
 pid_file: /data/homeserver.pid
+report_stats: false
 
 # --- Listeners ---
 listeners:
