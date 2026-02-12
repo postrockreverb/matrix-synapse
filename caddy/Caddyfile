@@ -18,7 +18,7 @@
 	handle /.well-known/matrix/client {
 		header Content-Type application/json
 		header Access-Control-Allow-Origin *
-		respond `{"m.homeserver": {"base_url": "https://{$SYNAPSE_HOSTNAME}"}}`
+		respond `{"m.homeserver": {"base_url": "https://{$SYNAPSE_HOSTNAME}"}, "org.matrix.msc4143.rtc_foci": [{"type": "livekit", "livekit_service_url": "https://{$LIVEKIT_HOSTNAME}"}]}`
 	}
 
 	# Proxy everything else to Synapse
@@ -38,6 +38,20 @@
 	reverse_proxy element:80
 }
 
+# --- LiveKit / MatrixRTC ---
+{$LIVEKIT_HOSTNAME} {
+	# lk-jwt-service endpoints (token issuance)
+	@jwt_service path /sfu/get /get_token /healthz
+	handle @jwt_service {
+		reverse_proxy lk-jwt-service:8080
+	}
+
+	# LiveKit SFU WebSocket (signaling)
+	handle {
+		reverse_proxy livekit:7880
+	}
+}
+
 # --- Base domain .well-known delegation (optional) ---
 # If your DOMAIN != SYNAPSE_HOSTNAME, serve .well-known from the base domain
 # so that @user:example.com works even though Synapse runs on matrix.example.com
@@ -53,7 +67,7 @@
 # 	handle /.well-known/matrix/client {
 # 		header Content-Type application/json
 # 		header Access-Control-Allow-Origin *
-# 		respond `{"m.homeserver": {"base_url": "https://{$SYNAPSE_HOSTNAME}"}}`
+# 		respond `{"m.homeserver": {"base_url": "https://{$SYNAPSE_HOSTNAME}"}, "org.matrix.msc4143.rtc_foci": [{"type": "livekit", "livekit_service_url": "https://{$LIVEKIT_HOSTNAME}"}]}`
 # 	}
 #
 # 	# Serve your normal website or redirect

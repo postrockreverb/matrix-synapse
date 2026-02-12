@@ -1,0 +1,50 @@
+# =============================================================================
+# LiveKit SFU Configuration
+# =============================================================================
+# Copy this file to config.yaml and fill in your values:
+#   cp livekit/config.yaml.example livekit/config.yaml
+#
+# Full reference: https://docs.livekit.io/home/self-hosting/deployment/
+# =============================================================================
+
+port: 7880
+
+rtc:
+  # UDP port range for WebRTC media (must match firewall rules)
+  port_range_start: 50000
+  port_range_end: 50200
+
+  # WebRTC over TCP fallback (for clients behind restrictive firewalls)
+  tcp_port: 7881
+
+  # Auto-detect public IP via STUN (works on most VPS providers)
+  use_external_ip: true
+
+  # If use_external_ip doesn't detect correctly, set manually:
+  # use_external_ip: false
+  # node_ip: CHANGEME_VPS_PUBLIC_IP
+
+  # Use existing coturn for TURN relay
+  turn_servers:
+    - host: CHANGEME_SYNAPSE_HOSTNAME
+      port: 3478
+      protocol: udp
+      secret: "CHANGEME_TURN_SECRET"
+      ttl: 14400
+
+# API key/secret pair (must match lk-jwt-service config and .env)
+keys:
+  CHANGEME_LIVEKIT_API_KEY: CHANGEME_LIVEKIT_API_SECRET
+
+# Room settings
+room:
+  # MUST be false — delegates room creation to lk-jwt-service
+  # which enforces access control based on homeserver allowlist
+  auto_create: false
+
+logging:
+  level: info
+
+# TURN is handled by existing coturn, not LiveKit's built-in
+turn:
+  enabled: false

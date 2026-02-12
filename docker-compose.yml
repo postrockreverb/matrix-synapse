@@ -63,6 +63,35 @@ services:
       - ./coturn/turnserver.conf:/etc/turnserver.conf:ro
 
   # ===========================================================================
+  # LiveKit - SFU for Element Call / MatrixRTC
+  # ===========================================================================
+  livekit:
+    image: livekit/livekit-server:latest
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    ports:
+      - "7881:7881/tcp"              # WebRTC TCP fallback (direct, not proxied)
+      - "50000-50200:50000-50200/udp" # WebRTC media (direct, not proxied)
+    volumes:
+      - ./livekit/config.yaml:/etc/livekit.yaml:ro
+    networks:
+      - caddy_net
+
+  # ===========================================================================
+  # lk-jwt-service - LiveKit token service for MatrixRTC
+  # ===========================================================================
+  lk-jwt-service:
+    image: ghcr.io/element-hq/lk-jwt-service:0.4.1
+    restart: unless-stopped
+    environment:
+      LIVEKIT_URL: "wss://${LIVEKIT_HOSTNAME}"
+      LIVEKIT_KEY: "${LIVEKIT_API_KEY}"
+      LIVEKIT_SECRET: "${LIVEKIT_API_SECRET}"
+      LIVEKIT_FULL_ACCESS_HOMESERVERS: "${DOMAIN}"
+    networks:
+      - caddy_net
+
+  # ===========================================================================
   # Caddy - Reverse proxy with automatic HTTPS (Let's Encrypt)
   # ===========================================================================
   caddy:

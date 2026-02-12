@@ -11,17 +11,21 @@ A declarative, repeatable Matrix Synapse deployment with Docker Compose. Include
 | **Element Web** | Matrix web client |
 | **coturn** | TURN/STUN server for VoIP and screen sharing |
 | **Caddy** | Reverse proxy with automatic Let's Encrypt TLS |
+| **LiveKit** | SFU for Element Call group voice/video (MatrixRTC) |
+| **lk-jwt-service** | Token service that authorizes Matrix users for LiveKit |
 
 ## Architecture
 
 ```
 Internet
-  │
   ├─ :80/:443/:8448 ──► Caddy (TLS termination)
   │                        ├─► Synapse (:8008) ──► PostgreSQL
-  │                        └─► Element Web (:80)
-  │
-  └─ :3478/:5349/:49152-49200 ──► coturn (host network, TURN/STUN)
+  │                        ├─► Element Web (:80)
+  │                        ├─► lk-jwt-service (:8080)  [livekit.example.com]
+  │                        └─► LiveKit (:7880)          [livekit.example.com WebSocket]
+  ├─ :3478/:5349/:49152-49200 ──► coturn (host network, TURN/STUN)
+  ├─ :7881/tcp ──► LiveKit (WebRTC TCP fallback)
+  └─ :50000-50200/udp ──► LiveKit (WebRTC media)
 ```
 
 ## Quick Start
@@ -35,18 +39,22 @@ cp .env.example .env
 cp synapse/homeserver.yaml.example synapse/homeserver.yaml
 cp coturn/turnserver.conf.example coturn/turnserver.conf
 cp element/config.json.example element/config.json
+cp livekit/config.yaml.example livekit/config.yaml
 
 # 3. Edit all config files — replace every CHANGEME_* value
-nano .env                       # Set hostnames and generate a POSTGRES_PASSWORD
+nano .env                       # Set hostnames, domain, and generate secrets
 nano synapse/homeserver.yaml    # Domain, secrets, database, TURN
 nano coturn/turnserver.conf     # TURN secret, external IP
 nano element/config.json        # Domain and homeserver URL
+nano livekit/config.yaml        # LiveKit API key/secret, TURN secret
 
 # Generate secrets for the config files (run each, paste into the config)
-openssl rand -hex 32   # registration_shared_secret
-openssl rand -hex 32   # macaroon_secret_key
-openssl rand -hex 32   # form_secret
-openssl rand -hex 32   # turn_shared_secret (same in homeserver.yaml AND turnserver.conf)
+openssl rand -hex 32    # registration_shared_secret
+openssl rand -hex 32    # macaroon_secret_key
+openssl rand -hex 32    # form_secret
+openssl rand -hex 32    # turn_shared_secret (same in homeserver.yaml AND turnserver.conf)
+openssl rand -base64 16 # LIVEKIT_API_KEY (same in .env AND livekit/config.yaml)
+openssl rand -base64 32 # LIVEKIT_API_SECRET (same in .env AND livekit/config.yaml)
 
 # 4. Set up DNS and firewall (see below)
 
@@ -65,8 +73,9 @@ docker compose exec synapse register_new_matrix_user \
 Create A records pointing to your VPS IP:
 
 ```
-matrix.example.com  →  YOUR_VPS_IP
-element.example.com →  YOUR_VPS_IP
+matrix.example.com   →  YOUR_VPS_IP
+element.example.com  →  YOUR_VPS_IP
+livekit.example.com  →  YOUR_VPS_IP
 ```
 
 ### Federation Delegation
@@ -100,6 +109,10 @@ sudo ufw allow 3478/udp
 sudo ufw allow 5349/tcp
 sudo ufw allow 5349/udp
 sudo ufw allow 49152:49200/udp  # Relay ports
+
+# LiveKit (Element Call)
+sudo ufw allow 7881/tcp         # WebRTC TCP fallback
+sudo ufw allow 50000:50200/udp  # WebRTC media
 ```
 
 ## Maintenance
@@ -136,6 +149,8 @@ matrix-synapse-docker/
 │   └── turnserver.conf.example     # Copy to turnserver.conf, edit CHANGEME values
 ├── element/
 │   └── config.json.example         # Copy to config.json, edit CHANGEME values
+├── livekit/
+│   └── config.yaml.example         # Copy to config.yaml, edit CHANGEME values
 └── synapse/
     ├── homeserver.yaml.example     # Copy to homeserver.yaml, edit CHANGEME values
     └── log.config                  # Logging configuration
@@ -150,6 +165,7 @@ cp .env.example .env
 cp synapse/homeserver.yaml.example synapse/homeserver.yaml
 cp coturn/turnserver.conf.example coturn/turnserver.conf
 cp element/config.json.example element/config.json
+cp livekit/config.yaml.example livekit/config.yaml
 # Edit .env and all config files (replace CHANGEME values)
 docker compose up -d
 ```

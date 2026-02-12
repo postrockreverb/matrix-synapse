@@ -5,6 +5,7 @@
 synapse/homeserver.yaml
 coturn/turnserver.conf
 element/config.json
+livekit/config.yaml
 
 # Synapse runtime files
 synapse/*.signing.key

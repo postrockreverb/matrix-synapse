@@ -99,8 +99,8 @@ turn_allow_guests: false
 
 # --- Rate Limiting ---
 rc_message:
-  per_second: 0.2
-  burst_count: 10
+  per_second: 0.5
+  burst_count: 30
 
 rc_registration:
   per_second: 0.17
@@ -113,6 +113,10 @@ rc_login:
   account:
     per_second: 0.17
     burst_count: 3
+
+rc_delayed_event_mgmt:
+  per_second: 1
+  burst_count: 20
 
 # --- Caching ---
 # Tune based on available RAM. Default is 0.5 (uses ~512MB).
@@ -149,5 +153,11 @@ push:
 
 # --- Experimental Features ---
 # Enable spaces, threads, etc. (most are now stable)
+# --- MatrixRTC / Element Call ---
+# Delayed events (MSC4140) — required for call heartbeats
+# Without this, disconnected participants appear as "ghost" callers indefinitely
+max_event_delay_duration: 24h
+
 experimental_features:
   msc3266_enabled: true   # Room summary API
+  msc4222_enabled: true   # Sync v2 state_after — reliable call state tracking
