@@ -4,6 +4,7 @@ services:
   # ===========================================================================
   postgres:
     image: postgres:16-alpine
+    container_name: matrix-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -11,7 +12,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - /mnt/hdd1.5/a/volumes/matrix/postgres_data:/var/lib/postgresql/data
     networks:
       - matrix_internal
     healthcheck:
@@ -25,29 +26,31 @@ services:
   # ===========================================================================
   synapse:
     image: matrixdotorg/synapse:latest
+    container_name: matrix-synapse
     restart: unless-stopped
     environment:
       SYNAPSE_CONFIG_PATH: /data/homeserver.yaml
     volumes:
       - ./synapse:/data
-      - synapse_media:/data/media_store
+      - /mnt/hdd1.5/a/volumes/matrix/synapse_media:/data/media_store
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - matrix_internal
-      - caddy_net
+      - npm_external
 
   # ===========================================================================
   # Element Web - Matrix web client
   # ===========================================================================
   element:
     image: vectorim/element-web:latest
+    container_name: matrix-element
     restart: unless-stopped
     volumes:
       - ./element/config.json:/app/config.json:ro
     networks:
-      - caddy_net
+      - npm_external
 
   # ===========================================================================
   # coturn - TURN/STUN server for VoIP and screen sharing
@@ -57,6 +60,7 @@ services:
   # port range (49152-49200+). Host networking avoids this entirely.
   coturn:
     image: coturn/coturn:latest
+    container_name: matrix-coturn
     restart: unless-stopped
     network_mode: host
     volumes:
@@ -67,6 +71,7 @@ services:
   # ===========================================================================
   livekit:
     image: livekit/livekit-server:latest
+    container_name: matrix-livekit
     restart: unless-stopped
     command: --config /etc/livekit.yaml
     ports:
@@ -75,49 +80,30 @@ services:
     volumes:
       - ./livekit/config.yaml:/etc/livekit.yaml:ro
     networks:
-      - caddy_net
+      - npm_external
 
   # ===========================================================================
   # lk-jwt-service - LiveKit token service for MatrixRTC
   # ===========================================================================
   lk-jwt-service:
     image: ghcr.io/element-hq/lk-jwt-service:0.4.1
+    container_name: matrix-lk-jwt-service
     restart: unless-stopped
     environment:
       LIVEKIT_URL: "wss://${LIVEKIT_HOSTNAME}"
       LIVEKIT_KEY: "${LIVEKIT_API_KEY}"
       LIVEKIT_SECRET: "${LIVEKIT_API_SECRET}"
       LIVEKIT_FULL_ACCESS_HOMESERVERS: "${DOMAIN}"
+    extra_hosts:
+      - "${DOMAIN}:host-gateway"
+      - "${SYNAPSE_HOSTNAME}:host-gateway"
+      - "${LIVEKIT_HOSTNAME}:host-gateway"
     networks:
-      - caddy_net
-
-  # ===========================================================================
-  # Caddy - Reverse proxy with automatic HTTPS (Let's Encrypt)
-  # ===========================================================================
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    env_file: .env
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"   # HTTP/3 (QUIC)
-      - "8448:8448"      # Matrix federation
-    volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    networks:
-      - caddy_net
-
-volumes:
-  postgres_data:
-  synapse_media:
-  caddy_data:
-  caddy_config:
+      - npm_external
 
 networks:
   matrix_internal:
     # Synapse <-> Postgres only
-  caddy_net:
-    # Caddy <-> Synapse/Element
+  npm_external:
+    # Pre-existing NPM network — containers join it to be reachable by name
+    external: true
