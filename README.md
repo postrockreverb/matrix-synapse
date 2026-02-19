@@ -37,12 +37,12 @@ git clone <this-repo> && cd matrix-synapse-docker
 #    (copies .example files, prompts for values, generates secrets)
 ./scripts/configure.sh
 
-# 3. Set up DNS and firewall (see below)
+# 3. Set up DNS, firewall, and Nginx Proxy Manager (see below)
 
-# 5. Start everything
+# 4. Start everything
 docker compose up -d
 
-# 6. Create your admin user
+# 5. Create your admin user
 docker compose exec synapse register_new_matrix_user \
   -c /data/homeserver.yaml \
   -u admin -a \
@@ -59,19 +59,137 @@ element.example.com  →  YOUR_VPS_IP
 livekit.example.com  →  YOUR_VPS_IP
 ```
 
+## Nginx Proxy Manager Setup
+
+This deployment expects an external Nginx Proxy Manager (NPM) instance. All containers join NPM's Docker network (`npm_external`) and are accessed by container name.
+
+Create the following proxy hosts and stream in NPM:
+
+### 1. Base domain — `example.com`
+
+Handles `.well-known` federation delegation so Matrix IDs can be `@user:example.com`.
+
+| Setting | Value |
+|---------|-------|
+| Domain Names | `example.com` |
+| Scheme | `http` |
+| Forward Hostname/IP | `matrix-synapse` |
+| Forward Port | `8008` |
+| SSL | Force SSL, HTTP/2 Support |
+
+**Advanced tab** — custom Nginx configuration:
+
+```nginx
+location /.well-known/matrix/server {
+    default_type application/json;
+    add_header Access-Control-Allow-Origin *;
+    return 200 '{"m.server": "matrix.example.com:443"}';
+}
+
+location /.well-known/matrix/client {
+    default_type application/json;
+    add_header Access-Control-Allow-Origin *;
+    return 200 '{"m.homeserver": {"base_url": "https://matrix.example.com"}, "org.matrix.msc4143.rtc_foci": [{"type": "livekit", "livekit_service_url": "https://livekit.example.com"}]}';
+}
+```
+
+### 2. Synapse — `matrix.example.com`
+
+| Setting | Value |
+|---------|-------|
+| Domain Names | `matrix.example.com` |
+| Scheme | `http` |
+| Forward Hostname/IP | `matrix-synapse` |
+| Forward Port | `8008` |
+| Websockets Support | on |
+| SSL | Force SSL, HTTP/2 Support |
+
+### 3. Element Web — `element.example.com`
+
+| Setting | Value |
+|---------|-------|
+| Domain Names | `element.example.com` |
+| Scheme | `http` |
+| Forward Hostname/IP | `matrix-element` |
+| Forward Port | `80` |
+| SSL | Force SSL, HTTP/2 Support |
+
+**Advanced tab** — custom Nginx configuration (required for Element Call E2EE and security headers):
+
+```nginx
+location / {
+    proxy_pass $forward_scheme://$server:$port;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    add_header X-Frame-Options SAMEORIGIN;
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection "1; mode=block";
+    add_header Content-Security-Policy "frame-ancestors 'self'";
+    add_header Cross-Origin-Opener-Policy "same-origin";
+    add_header Cross-Origin-Embedder-Policy "credentialless";
+}
+```
+
+> **Note**: The custom `location /` block is required because NPM ignores `add_header` directives placed at the top level of the Advanced tab. The `proxy_pass` must be included since this block replaces NPM's generated one.
+
+### 4. LiveKit — `livekit.example.com`
+
+| Setting | Value |
+|---------|-------|
+| Domain Names | `livekit.example.com` |
+| Scheme | `http` |
+| Forward Hostname/IP | `matrix-livekit` |
+| Forward Port | `7880` |
+| Websockets Support | on |
+| SSL | Force SSL, HTTP/2 Support |
+
+**Advanced tab** — custom Nginx configuration (routes JWT token endpoints to lk-jwt-service):
+
+```nginx
+location /sfu/get {
+    proxy_pass http://matrix-lk-jwt-service:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location /get_token {
+    proxy_pass http://matrix-lk-jwt-service:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location /healthz {
+    proxy_pass http://matrix-lk-jwt-service:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+### 5. Federation fallback — port 8448 (Stream)
+
+In NPM go to **Streams** (not Proxy Hosts):
+
+| Setting | Value |
+|---------|-------|
+| Incoming Port | `8448` |
+| Forward Host | `matrix-synapse` |
+| Forward Port | `8008` |
+| TCP Forwarding | on |
+
+> Modern federation uses port 443 with `.well-known` delegation (step 1). The 8448 stream is a fallback for legacy servers.
+
 ### Federation Delegation
 
-If your Matrix IDs should be `@user:example.com` (not `@user:matrix.example.com`), you need `.well-known` delegation from your base domain. Two options:
-
-Configure `.well-known` delegation on your base domain's reverse proxy (e.g., Nginx Proxy Manager). Serve these JSON responses:
-
-```
-# Serve at https://example.com/.well-known/matrix/server
-{"m.server": "matrix.example.com:443"}
-
-# Serve at https://example.com/.well-known/matrix/client
-{"m.homeserver": {"base_url": "https://matrix.example.com"}}
-```
+If your Matrix IDs should be `@user:example.com` (not `@user:matrix.example.com`), the `.well-known` endpoints in step 1 handle this. The base domain (`example.com`) must be served by NPM with a proxy host as described above.
 
 Test federation at: https://federationtester.matrix.org/
 
