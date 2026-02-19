@@ -83,6 +83,10 @@ echo
 VPS_PUBLIC_IP=$(prompt_required "Enter your VPS public IP address")
 
 echo
+# Storage configuration
+VOLUMES_PATH=$(prompt_required "Enter base path for data volumes (e.g., /mnt/disk/matrix)")
+
+echo
 # Database configuration
 POSTGRES_USER=$(prompt_with_default "Enter PostgreSQL username" "synapse")
 POSTGRES_DB=$(prompt_with_default "Enter PostgreSQL database name" "synapse")
@@ -128,6 +132,7 @@ echo
 
 FILES=(
     ".env.example:.env"
+    "docker-compose.yml.example:docker-compose.yml"
     "synapse/homeserver.yaml.example:synapse/homeserver.yaml"
     "coturn/turnserver.conf.example:coturn/turnserver.conf"
     "element/config.json.example:element/config.json"
@@ -179,11 +184,13 @@ s|CHANGEME_FORM_SECRET|$FORM_SECRET|g
 s|CHANGEME_TURN_SECRET|$TURN_SECRET|g
 s|CHANGEME_LIVEKIT_API_KEY|$LIVEKIT_API_KEY|g
 s|CHANGEME_LIVEKIT_API_SECRET|$LIVEKIT_API_SECRET|g
+s|CHANGEME_VOLUMES_PATH|$VOLUMES_PATH|g
 EOF
 
 # Apply replacements to each config file
 CONFIG_FILES=(
     ".env"
+    "docker-compose.yml"
     "synapse/homeserver.yaml"
     "coturn/turnserver.conf"
     "element/config.json"
@@ -257,6 +264,11 @@ echo -e "  LiveKit hostname:  $LIVEKIT_HOSTNAME"
 echo
 echo -e "${GREEN}Server Configuration:${NC}"
 echo -e "  VPS IP:            $VPS_PUBLIC_IP"
+echo
+echo -e "${GREEN}Storage Configuration:${NC}"
+echo -e "  Volumes path:      $VOLUMES_PATH"
+echo -e "  PostgreSQL data:   $VOLUMES_PATH/postgres_data"
+echo -e "  Synapse media:     $VOLUMES_PATH/synapse_media"
 echo
 echo -e "${GREEN}Database Configuration:${NC}"
 echo -e "  User:              $POSTGRES_USER"

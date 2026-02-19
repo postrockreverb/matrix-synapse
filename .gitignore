@@ -1,7 +1,8 @@
 # Secrets
 .env
 
-# Config files (copied from .example, contain secrets)
+# Config files (copied from .example, contain secrets/paths)
+docker-compose.yml
 synapse/homeserver.yaml
 coturn/turnserver.conf
 element/config.json
@@ -11,9 +12,6 @@ livekit/config.yaml
 synapse/*.signing.key
 synapse/signing.key
 synapse/*.pid
-
-# Docker volumes (if using bind mounts)
-postgres_data/
 
 # Claude Code
 .claude/

@@ -10,7 +10,6 @@ A declarative, repeatable Matrix Synapse deployment with Docker Compose. Include
 | **PostgreSQL 16** | Database backend (not SQLite) |
 | **Element Web** | Matrix web client |
 | **coturn** | TURN/STUN server for VoIP and screen sharing |
-| **Caddy** | Reverse proxy with automatic Let's Encrypt TLS |
 | **LiveKit** | SFU for Element Call group voice/video (MatrixRTC) |
 | **lk-jwt-service** | Token service that authorizes Matrix users for LiveKit |
 
@@ -18,7 +17,7 @@ A declarative, repeatable Matrix Synapse deployment with Docker Compose. Include
 
 ```
 Internet
-  ├─ :80/:443/:8448 ──► Caddy (TLS termination)
+  ├─ :80/:443/:8448 ──► Nginx Proxy Manager (TLS termination, external)
   │                        ├─► Synapse (:8008) ──► PostgreSQL
   │                        ├─► Element Web (:80)
   │                        ├─► lk-jwt-service (:8080)  [livekit.example.com]
@@ -34,29 +33,11 @@ Internet
 # 1. Clone and enter the directory
 git clone <this-repo> && cd matrix-synapse-docker
 
-# 2. Copy example files
-cp .env.example .env
-cp synapse/homeserver.yaml.example synapse/homeserver.yaml
-cp coturn/turnserver.conf.example coturn/turnserver.conf
-cp element/config.json.example element/config.json
-cp livekit/config.yaml.example livekit/config.yaml
+# 2. Run the interactive configuration script
+#    (copies .example files, prompts for values, generates secrets)
+./scripts/configure.sh
 
-# 3. Edit all config files — replace every CHANGEME_* value
-nano .env                       # Set hostnames, domain, and generate secrets
-nano synapse/homeserver.yaml    # Domain, secrets, database, TURN
-nano coturn/turnserver.conf     # TURN secret, external IP
-nano element/config.json        # Domain and homeserver URL
-nano livekit/config.yaml        # LiveKit API key/secret, TURN secret
-
-# Generate secrets for the config files (run each, paste into the config)
-openssl rand -hex 32    # registration_shared_secret
-openssl rand -hex 32    # macaroon_secret_key
-openssl rand -hex 32    # form_secret
-openssl rand -hex 32    # turn_shared_secret (same in homeserver.yaml AND turnserver.conf)
-openssl rand -base64 16 # LIVEKIT_API_KEY (same in .env AND livekit/config.yaml)
-openssl rand -base64 32 # LIVEKIT_API_SECRET (same in .env AND livekit/config.yaml)
-
-# 4. Set up DNS and firewall (see below)
+# 3. Set up DNS and firewall (see below)
 
 # 5. Start everything
 docker compose up -d
@@ -82,9 +63,7 @@ livekit.example.com  →  YOUR_VPS_IP
 
 If your Matrix IDs should be `@user:example.com` (not `@user:matrix.example.com`), you need `.well-known` delegation from your base domain. Two options:
 
-**Option A**: If this Caddy serves your base domain too, uncomment the delegation block in `caddy/Caddyfile`.
-
-**Option B**: If your base domain is served elsewhere (e.g., a separate web server), add this to that server:
+Configure `.well-known` delegation on your base domain's reverse proxy (e.g., Nginx Proxy Manager). Serve these JSON responses:
 
 ```
 # Serve at https://example.com/.well-known/matrix/server
@@ -120,7 +99,6 @@ sudo ufw allow 50000:50200/udp  # WebRTC media
 ```bash
 # View logs
 docker compose logs -f synapse
-docker compose logs -f caddy
 
 # Restart a service
 docker compose restart synapse
@@ -140,17 +118,17 @@ cat backup.sql | docker compose exec -T postgres psql -U synapse synapse
 
 ```
 matrix-synapse-docker/
-├── .env.example                    # Copy to .env (Caddy + Postgres runtime vars)
+├── .env.example                    # Copy to .env (hostnames, secrets, Postgres vars)
 ├── .gitignore
-├── docker-compose.yml              # Service definitions
-├── caddy/
-│   └── Caddyfile                   # Reverse proxy + TLS config
+├── docker-compose.yml.example      # Copy to docker-compose.yml (volume paths)
 ├── coturn/
 │   └── turnserver.conf.example     # Copy to turnserver.conf, edit CHANGEME values
 ├── element/
 │   └── config.json.example         # Copy to config.json, edit CHANGEME values
 ├── livekit/
 │   └── config.yaml.example         # Copy to config.yaml, edit CHANGEME values
+├── scripts/
+│   └── configure.sh                # Interactive setup script for CHANGEME values
 └── synapse/
     ├── homeserver.yaml.example     # Copy to homeserver.yaml, edit CHANGEME values
     └── log.config                  # Logging configuration
@@ -161,20 +139,13 @@ matrix-synapse-docker/
 ```bash
 # On new server:
 git clone <this-repo> && cd matrix-synapse-docker
-cp .env.example .env
-cp synapse/homeserver.yaml.example synapse/homeserver.yaml
-cp coturn/turnserver.conf.example coturn/turnserver.conf
-cp element/config.json.example element/config.json
-cp livekit/config.yaml.example livekit/config.yaml
-# Edit .env and all config files (replace CHANGEME values)
+./scripts/configure.sh
 docker compose up -d
 ```
 
 If migrating, also restore your database backup and copy the signing key.
 
 ## Troubleshooting
-
-**Caddy won't get certificates**: Ensure ports 80 and 443 are open and DNS is pointing to your VPS. Check `docker compose logs caddy`.
 
 **Federation not working**: Test at https://federationtester.matrix.org/. Most common issues are missing `.well-known` delegation or port 8448 being blocked.
 

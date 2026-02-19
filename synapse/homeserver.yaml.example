@@ -76,7 +76,7 @@ trusted_key_servers:
 
 # --- Federation ---
 # serve_server_wellknown tells Synapse to respond to /.well-known/matrix/server
-# We handle this in Caddy instead for more control, but you can enable this
+# We handle this in the reverse proxy instead for more control, but you can enable this
 # if you prefer Synapse to handle it directly.
 # serve_server_wellknown: true
 

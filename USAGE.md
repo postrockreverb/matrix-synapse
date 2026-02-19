@@ -2,11 +2,11 @@
 
 ## Accessing Your Server
 
-- **Element Web Client**: https://element.baraso.app
-- **Your Matrix ID**: `@yourname:baraso.app`
-- **Homeserver URL** (for other clients): `matrix.baraso.app`
+- **Element Web Client**: https://element.example.com
+- **Your Matrix ID**: `@yourname:example.com`
+- **Homeserver URL** (for other clients): `matrix.example.com`
 
-Any Matrix client (Element mobile, FluffyChat, Nheko, etc.) can connect using `matrix.baraso.app` as the homeserver.
+Any Matrix client (Element mobile, FluffyChat, Nheko, etc.) can connect using `matrix.example.com` as the homeserver.
 
 ## User Management
 
@@ -65,7 +65,6 @@ Share the token with the person you want to invite — they enter it during regi
 ```bash
 docker compose logs -f                # All services
 docker compose logs -f synapse        # Just Synapse
-docker compose logs -f caddy          # Just Caddy
 docker compose logs -f postgres       # Just Postgres
 ```
 
@@ -73,7 +72,6 @@ docker compose logs -f postgres       # Just Postgres
 
 ```bash
 docker compose restart synapse
-docker compose restart caddy
 docker compose restart               # All services
 ```
 
@@ -109,23 +107,22 @@ The signing key at `synapse/signing.key` is critical for federation identity. Ba
 
 ### Media
 
-Media files are stored in the `synapse_media` Docker volume. Back it up with:
+Media files are stored at `/mnt/hdd1.5/a/volumes/matrix/synapse_media`. Back it up with:
 
 ```bash
-docker run --rm -v matrix-synapse_synapse_media:/data -v $(pwd):/backup alpine \
-  tar czf /backup/media_backup.tar.gz -C /data .
+tar czf media_backup.tar.gz -C /mnt/hdd1.5/a/volumes/matrix/synapse_media .
 ```
 
 ## Federation
 
-- **Test federation**: https://federationtester.matrix.org/ — enter `baraso.app`
+- **Test federation**: https://federationtester.matrix.org/ — enter `example.com`
 - **Test TURN/VoIP**: https://test.voip.librepush.net/
 
 Federation lets you communicate with users on any other Matrix server. Your users can join rooms on `matrix.org` or any other federated server.
 
 ## Troubleshooting
 
-**Can't connect to Element**: Check `docker compose logs caddy`. Usually a DNS or certificate issue.
+**Can't connect to Element**: Check your Nginx Proxy Manager logs. Usually a DNS or certificate issue.
 
 **Synapse won't start**: Check `docker compose logs synapse`. Common causes are YAML syntax errors in `homeserver.yaml`.
 
@@ -141,5 +138,4 @@ Federation lets you communicate with users on any other Matrix server. Your user
 | `synapse/homeserver.yaml` | Main Synapse configuration |
 | `coturn/turnserver.conf` | TURN server configuration |
 | `element/config.json` | Element web client configuration |
-| `caddy/Caddyfile` | Reverse proxy and TLS |
 | `synapse/signing.key` | Federation identity (back this up!) |

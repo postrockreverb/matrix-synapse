@@ -14,7 +14,7 @@ docker compose up -d
 docker compose down
 
 # View logs
-docker compose logs -f [synapse|caddy|postgres|element|coturn]
+docker compose logs -f [synapse|postgres|element|coturn|livekit|lk-jwt-service]
 
 # Update images
 docker compose pull && docker compose up -d
@@ -32,7 +32,7 @@ cat backup.sql | docker compose exec -T postgres psql -U synapse synapse
 
 ```
 Internet
-  ├─ :80/:443/:8448 ──► Caddy (TLS termination, auto Let's Encrypt)
+  ├─ :80/:443/:8448 ──► Nginx Proxy Manager (TLS termination)
   │                        ├─► Synapse (:8008) ──► PostgreSQL
   │                        ├─► Element Web (:80)
   │                        ├─► lk-jwt-service (:8080)  [livekit subdomain]
@@ -42,7 +42,7 @@ Internet
   └─ :50000-50200/udp ──► LiveKit (WebRTC media)
 ```
 
-**Networks**: `matrix_internal` (Synapse ↔ PostgreSQL only), `caddy_net` (Caddy ↔ Synapse/Element/LiveKit/lk-jwt-service). coturn uses host networking to avoid per-port iptables rules for the relay range.
+**Networks**: `matrix_internal` (Synapse ↔ PostgreSQL only), `npm_external` (external NPM network — Synapse/Element/LiveKit/lk-jwt-service join it to be reachable by container name from NPM). coturn uses host networking to avoid per-port iptables rules for the relay range.
 
 ## Configuration
 
@@ -50,6 +50,7 @@ Each config has an `.example` file that gets copied and edited. Replace `CHANGEM
 
 | Example File | Copy To | Purpose |
 |-------------|---------|---------|
+| `docker-compose.yml.example` | `docker-compose.yml` | Service definitions (volume paths) |
 | `synapse/homeserver.yaml.example` | `synapse/homeserver.yaml` | Synapse server config (domain, secrets, database, TURN) |
 | `coturn/turnserver.conf.example` | `coturn/turnserver.conf` | TURN/STUN server (shared secret, external IP) |
 | `element/config.json.example` | `element/config.json` | Element web client (homeserver URL, domain) |
@@ -58,13 +59,13 @@ Each config has an `.example` file that gets copied and edited. Replace `CHANGEM
 
 The copied config files are gitignored since they contain secrets. The `.example` files are committed.
 
-**`.env`** holds runtime vars consumed by Docker Compose: `SYNAPSE_HOSTNAME`, `ELEMENT_HOSTNAME`, `LIVEKIT_HOSTNAME` (used by Caddy), `DOMAIN` (used by lk-jwt-service), `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (used by lk-jwt-service), `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` (used by PostgreSQL).
+**`.env`** holds runtime vars consumed by Docker Compose: `SYNAPSE_HOSTNAME`, `ELEMENT_HOSTNAME`, `LIVEKIT_HOSTNAME` (used by lk-jwt-service's `extra_hosts`), `DOMAIN` (used by lk-jwt-service), `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (used by lk-jwt-service), `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` (used by PostgreSQL).
 
 ## Key Constraints
 
 - YAML in `homeserver.yaml` is whitespace-sensitive — preserve indentation exactly
-- The Caddy `Caddyfile` uses `{$ENV_VAR}` syntax for runtime environment variable substitution
-- Federation requires `.well-known` delegation if Matrix IDs use the base domain rather than the `matrix.` subdomain — see `caddy/Caddyfile` comments or README for setup options
+- Reverse proxying is handled by an external Nginx Proxy Manager instance (not part of this compose stack)
+- Federation requires `.well-known` delegation on the `server_name` domain — configure this in NPM
 - The `turn_shared_secret` in `homeserver.yaml` must match `static-auth-secret` in `turnserver.conf`
 - LiveKit API key/secret must match between `.env` and `livekit/config.yaml`
 - The TURN secret in `livekit/config.yaml` must also match `turnserver.conf`
